@@ -1,16 +1,16 @@
 ﻿namespace cv2
 import console
-var dll = ..raw.loadDll("~/lib/cv2/.res/OpenCvSharpExtern.dll","cv2","cdecl")
+var dll = ..raw.loadDll("~/lib/cv2/.res/OpenCvSharpExtern.dll","opencv2","cdecl")
 
 var f2i = function(p){
-    return ::POINT(p.x,p.y); 
+    return ::POINT(..math.round(p.x),..math.round(p.y)); 
 }
 
 /*imgcodecs{{*/
 imread = function(path,mode=1/*_CV2_IMREAD_COLOR*/){
     var path = ..io.fullpath(path)
 	if(..io.exist(path)){
-		var err,ret = dll.imgcodecs_imread(path,mode,{ptr p})
+		var err,ret = dll.imgcodecs_imread(..string.fromto(path),mode,{ptr p})
 		return ..cv2.mat(ret.p)
 	}
 	return null;
@@ -53,38 +53,43 @@ cvGetWindowHandle = function(name){
 
 /*core{{*/
 getTickCount = function(){
-	return dll.core_getTickCountL(); 
+    var err,ret = dll.core_getTickCount({LONG value});
+	return ret.value
 }
 
 copyMakeBorder = function(src,top,bottom,left,right,borderType=0/*_CV2_BorderTypes_BORDER_CONSTANT*/,color){
     var dst = ..cv2.mat();
-    if(borderType==0/*_CV2_BorderTypes_BORDER_CONSTANT*/ or !color){
+    if(borderType==0/*_CV2_BORDER_CONSTANT*/ or !color){
     	color = ::Scalar(0,0,0)
     }
 	var err = dll.core_copyMakeBorder(src.cvPtr,dst.cvPtr,top,bottom,left,right,borderType,color)
 	return dst; 
 }
 
-bitwise_and = function(src1,src2){
-    var dst = ..cv2.mat();
-	var err = dll.core_bitwise_and(src1.cvPtr,src2.cvPtr.dst.cvPtr,null);
+bitwise_and = function(src1,src2,mask){
+    var dst = ..cv2.mat();  
+    mask = mask ? (mask.cvPtr)
+	var err = dll.core_bitwise_and(src1.cvPtr,src2.cvPtr,dst.cvPtr,mask);
 	return dst; 
 }
 
-bitwise_or = function(src1,src2){
+bitwise_or = function(src1,src2,mask){
     var dst = ..cv2.mat();
+    mask = mask ? (mask.cvPtr)
 	var err = dll.core_bitwise_or(src1.cvPtr,src2.cvPtr.dst.cvPtr,null);
 	return dst; 
 }
 
-bitwise_xor = function(src1,src2){
+bitwise_xor = function(src1,src2,mask){
     var dst = ..cv2.mat();
+    mask = mask ? (mask.cvPtr)
 	var err = dll.core_bitwise_xor(src.cvPtr,src2.cvPtr,dst.cvPtr,null)
 	return dst; 
 }
 
-bitwise_not = function(src){
-	var err = dll.core_bitwise_not(src.cvPtr,src.cvPtr,null)
+bitwise_not = function(src,mask){
+    mask = mask ? (mask.cvPtr)
+	var err = dll.core_bitwise_not(src.cvPtr,src.cvPtr,mask)
 	return src; 
 }
 
@@ -96,19 +101,82 @@ normalize = function(src,alpha,beta,normType=0x20/*_CV2_NormTypes_NORM_MINMAX*/,
 }
 
 split = function(src){
-    var vecMat = ..cv2.vectorOfMat()
+    var vecMat = ..cv2.vector.mat()
     var err,ret = dll.core_split(src,vecMat.handle);
-	return ..table.map(vecMat.toArray(),function(v,k,result){
-			return ..cv2.mat(v); 
+    var result = ..table.map(vecMat.toArray(),function(v,k,result){
+			return v; 
 	})
+	vecMat.release()
+	return ..table.unpack(result)
 }
 
 merge = function(srcs){
     //var vecMat = ..cv2.vectorOfMat(srcs)
     var dst = ..cv2.mat();
-	dll.core_merge({ ptr p[] = srcs },#srcs,dst);
+    if(#srcs){
+ 		dll.core_merge({ ptr p[] = srcs },#srcs,dst);   	
+    }
 	return dst; 
 }
+
+flip = function(src,flipCode){
+    var dst = ..cv2.mat();
+	var err = dll.core_flip(src.cvPtr,dst.cvPtr,flipCode)
+	return dst; 
+}
+
+subtract = function(src1,src2,mask,dtype){
+    var dst = ..cv2.mat();
+    mask = mask ? mask.cvPtr
+	var err = dll.core_subtract_InputArray2(src1.cvPtr,src2.cvPtr,dst.cvPtr,mask,dtype)
+	return dst;
+}
+
+add = function(src1,src2,mask,dtype){
+	var dst = ..cv2.mat();
+	mask = mask ? mask.cvPtr
+	var  err = dll.core_add(src1.cvPtr,src2.cvPtr,dst.cvPtr,mask,dtype)
+	return dst; 
+}
+
+addWeighted = function(src1,alpha,src2,beta,gamma=0,dtype=-1){
+    var dst = ..cv2.mat();
+    var err = core_addWeighted(src1.cvPtr,alpha,src2.cvPtr,beta,gamma,dst.cvPtr,dtype);
+    return dst; 
+}
+
+minMaxLoc = function(src){
+    minLoc0 = ::POINT();
+    maxLoc0 = ::POINT();
+	var err,minVal,maxVal = core_minMaxLoc2(src.cvPtr,0,0,minLoc0,maxLoc0,null)
+	return minVal,maxVal,minLoc0,maxLoc0; 
+}
+
+rotate = function(src,rotateCode){
+	var dst = ..cv2.mat();
+	var err = dll.core_rotate(src.cvPtr,dst.cvPtr,rotateCode);
+	return dst; 
+}
+
+inRange = function(src,lower,upper){
+   	var tLower = type.rget(lower)
+   	var tUpper = type.rget(upper)
+   	var dst = ..cv2.mat()
+   	if(tLower=="mat" and tUpper=="mat"){
+   		err = dll.core_inRange_InputArray(src.cvPtr,lower.cvPtr,upper.cvPtr,dst.cvPtr)
+   	}
+   	elseif(tLower=="Scalar" and tUpper=="Scalar"){
+   		err = dll.core_inRange_Scalar(src.cvPtr,lower,upper,dst.cvPtr)
+   	}
+	return dst; 
+}
+
+compare = function(src1,src2,cmpop){
+    var dst = ..cv2.mat()
+	dll.core_compare(src1.cvPtr,src2.cvPtr,dst.cvPtr,cmpop)
+	return dst; 
+}
+
 
 /*}}*/
 
@@ -150,6 +218,12 @@ boxFilter = function(srcMat,ddepth=-1,ksize,anchor,normalize=true,borderType=4/*
 	anchor = anchor : ::POINT(-1,-1)
 	var dst = ..cv2.mat()
 	var err = dll.imgproc_boxFilter(srcMat.cvPtr,dst.cvPtr,ddepth,ksize,anchor,normalize,borderType)
+	return dst; 
+}
+
+bilateralFilter = function(src,d,sigmaColor,sigmaSpace,borderType=4/*_CV2_BORDER_DEFAULT*/){
+	var dst = ..cv2.mat()
+	var err = imgproc_bilateralFilter(src.cvPtr,dst.cvPtr,d,sigmaColor,sigmaSpace,borderType)
 	return dst; 
 }
 
@@ -203,7 +277,7 @@ drawMarker = function(src,position,color,markerType,markerSize=20,thickness=1,li
 
 putText = function(src,text,position,font=0/*_CV2_FONT_HERSHEY_SIMPLEX*/,fontSize=1,color,thickness=1){
     if !color color = ::Scalar(255,255,255)
-	var err = imgproc_putText(src.cvPtr,text,position,font,fontSize,color,thickness,0x10/*_CV2_LINE_AA*/,0)
+	var err = imgproc_putText(src.cvPtr,text,f2i(position),font,fontSize,color,thickness,0x10/*_CV2_LINE_AA*/,0)
 	return src; 
 }
 
@@ -251,21 +325,30 @@ distanceTransform = function(src,distanceType,maskSize){
 }
 
 findContours = function(src,mode=3/*_CV2_RETR_TREE*/,method=2/*_CV2_CHAIN_APPROX_SIMPLE*/){
-    var contours = ..cv2.vectorOfMat()
+    var contours = ..cv2.vector.mat()
     var hierarchy = ..cv2.mat()
 	var err = dll.imgproc_findContours1_OutputArray(src.cvPtr,contours,hierarchy.cvPtr,mode,method,::POINT())
-	return src,contours.toArray(),hierarchy; 
+	return src,contours,hierarchy; 
 }
 
 drawContours = function(src,contours,contourIdx=-1,color,thickness=1,lineType=0x10/*_CV2_LineTypes_LINE_AA*/){
-    var contoursLength = #contours  
+    var cType = type.rget(contours);
+    if(cType=="vectorOfMat"){
+    	contours = contours.toArray()
+    }
+    var contoursLength = #contours
+    if(contoursLength==0){
+    	return ; 
+    }
     color = color : (::Scalar(0,255,0))
     var err = dll.imgproc_drawContours_InputArray(src.cvPtr,{ ptr p[] = contours },contoursLength,contourIdx,color,thickness,lineType,null,0x7FFFFFFF/*_MAXLONG*/,::POINT())
 	return src; 
 }
 
 minAreaRect = function(points){
-    var err,ret = dll.imgproc_minAreaRect_InputArray(..cv2.mat(points).cvPtr,::RotatedRect( ::POINTF(),::POINTF(),0 ))
+    //var mp = ..cv2.mat(points)
+    var err,ret = dll.imgproc_minAreaRect_InputArray(points.cvPtr,::RotatedRect( ::POINTF(),::POINTF(),0 ))
+	//mp.release()
 	return ret; 
 }
 
@@ -278,6 +361,19 @@ boxPoints = function(box){
     }
     var err = dll.imgproc_boxPoints_Point2f(box,ref)
     return ref.value;
+}
+
+matchTemplate = function(src,temp,mode=5/*_CV2_TM_CCOEFF_NORMED*/,mask){
+    var dst = ..cv2.mat()
+	var err = dll.imgproc_matchTemplate(src.cvPtr,temp.cvPtr,dst.cvPtr,mode,mask)
+	return dst; 
+}
+
+filter2D = function(src,ddepth=-1,kernel,anchor,delta=0,borderType=4/*_CV2_BORDER_DEFAULT*/){
+	var dst = ..cv2.mat()
+	anchor = anchor : (::POINT(-1,-1))
+	var err = imgproc_filter2D(src.cvPtr,dst.cvPtr,ddepth,kernel.cvPtr,anchor,delta,borderType)
+	return dst; 
 }
 
 /*}}*/
@@ -307,6 +403,17 @@ class videoCapture{
 		return ret.value==1,dst
 	}
 	
+	grab = function(){
+		var err,ret = dll.videoio_VideoCapture_grab(this.ptr,{int value});
+		return ret.value==1; 
+	}
+	
+	retrieve = function(flag=0){
+		var dst = ..cv2.mat();
+		var err,ret = dll.videoio_VideoCapture_retrieve_OutputArray(this.ptr,dst.cvPtr,flag,{int value})
+		return ret==1,dst; 
+	}
+	
 	get = function(propId){
 		var err,ret = ..cv2.videoio_VideoCapture_get(this.ptr,propId,0)
 		return ret;
@@ -317,36 +424,235 @@ class videoCapture{
 		return ret==1; 
 	}
 	
+	getBackendName = function(){
+		var buf = ..raw.buffer(255);
+		var err = dll.videoio_VideoCapture_getBackendName(this.ptr,buf)
+		return ..raw.str(buf)
+	}
+	
 	release = function(){
 		dll.videoio_VideoCapture_delete(this.ptr)
 	}
 }
 
+VideoWriter_fourcc = function(c1,c2,c3,c4){
+	var err,ret = dll.videoio_VideoWriter_fourcc(c1,c2,c3,c4,{int value})
+	return ret.value; 
+}
+
+videoio_VideoWriter_new2 = dll.api("videoio_VideoWriter_new2","int(string filename,int fourcc, double fps,struct frameSize,int isColor,pointer value" )
+videoio_VideoWriter_new3 = dll.api("videoio_VideoWriter_new3","int(string filename,int apiPreference,int fourcc, double fps,struct frameSize,int isColor,pointer value)" )
+
+class VideoWriter{
+	ctor( arg,... ){
+		tArg = type(arg)
+		if(tArg==type.null){
+			var err,ret = dll.videoio_VideoWriter_new1({pointer value})
+			this.ptr = ret.value
+		}
+		elseif(tArg==type.string){
+			var params = {...}
+			if(#params==4){
+				var err,ret = videoio_VideoWriter_new2(arg,...)
+				this.ptr = ret.value
+			}
+			elseif(#params==5){
+				var err,ret = videoio_VideoWriter_new3(arg,...)
+				this.ptr = ret.value
+			}
+		}
+		
+	};
+	
+	release = function(){
+		if(this[["ptr"]]){
+			dll.videoio_VideoWriter_delete(this.this[["ptr"]])
+			this[["ptr"]] = null
+		}
+	}
+	
+
+}
+
+
+
 /*}}*/
 
+/*dnn{{*/
+class dnn_DetectionModel{
+	ctor( model,cfg,backend=3/*_CV2_DNN_BACKEND_OPENCV*/,target=0/*_CV2_DNN_TARGET_CPU*/ ){
+		err,ret = dll.dnn_readNet(model,cfg,"",{pointer value});
+		if(!err){
+			this.ptr = ret.value
+			dll.dnn_Net_setPreferableBackend(this.ptr,backend);
+			dll.dnn_Net_setPreferableTarget(this.ptr,target)
+		}
+		this.swap = true
+		this.scale = 1.0/255
+		//this.mean = ::Scalar(110,135,158)
+		this.mean = ::Scalar(0,0,0)
+		this.$config = {
+			confThreshold = 0.5; //分类置信度
+			nmsThreshold = 0.4; //nms置信度
+		}
+	};
+	
+	setConfig = function(config){
+		..table.assign( this.$config,config)
+	}
+	
+	setMean = function(b,g,r){
+		this.mean = ::Scalar(b,g,r)
+	}
+	
+	getUnconnectedOutLayers = function(){
+		var vecInt32 = ..cv2.vector.int32();
+		dll.dnn_Net_getUnconnectedOutLayers(this.ptr,vecInt32)
+		return vecInt32.toArray();
+	}
+	
+	getUnconnectedOutLayersNames = function(){
+		var vecString = ..cv2.vector.string();
+		dll.dnn_Net_getUnconnectedOutLayersNames(this.ptr,vecString)
+		return vecString.toArray(); 
+	}
+	
+	getLayerNames = function(){
+		var vecString = ..cv2.vector.string()
+		dll.dnn_Net_getLayerNames(this.ptr,vecString);
+		return vecString.toArray(); 
+	}
+	setInputSize = function(w,h){
+		this.size = ::SIZE(w,h)
+	}
+	
+	setInputScale = function(scale){
+		this.scale = scale : (1.0/255)
+	}
+	// bgr to rgb
+	setInputSwapRB = function(swap=true){
+		this.swap = swap
+	}
+	
+	blobFromImage = function(src){
+		var ret,ret2,ret3 = ..cv2.dnn_blobFromImage(src,this.scale,this.size,this.mean,1,0,null)
+		return ret2
+	}
+	
+	setInput = function(blob){
+		dll.dnn_Net_setInput(this.ptr,blob,"data")
+	}
+	
+	nmsBoxesRect = function(boxes,confidences,classIds){
+		if(!#boxes){
+			return; 
+		}
+		vConfidences = ..cv2.vector.float(confidences)
+		vBoxes = ..cv2.vector.rect(boxes)
+		vIndices = ..cv2.vector.int32();
+		var err,ret = ..cv2.dnn_NMSBoxes_Rect(vBoxes,vConfidences,this.$config.confThreshold,this.$config.nmsThreshold,vIndices,1.0,0)
+		var boxes = {}
+		var scores = {}
+		var ids = {}
 
-//图像运算 待智能提示
-subtract = function(src1,src2,mask,dtype){
-    var dst = ..cv2.mat();
-	dll.core_subtract_InputArray2(src1.cvPtr,src2.cvPtr,dst.cvPtr,mask,dtype)
-	return dst;
+		var boxesArray = vBoxes.toArray()
+		vIndicesArray = vIndices.toArray()
+		vConfidencesArray = vConfidences.toArray()
+		for(i=1;vIndices.size;1){
+			var idx = vIndicesArray[i];
+			var rect = boxesArray[idx+1]
+			..table.push( boxes,rect )
+			..table.push( scores,vConfidencesArray[idx+1] )
+			..table.push( ids,classIds[idx+1]+1)
+		}
+
+		//还原回0-1的浮点矩阵
+		boxes = ..table.map(boxes,function(v,k,result){
+			return ::RECTF(	v.left/this.size.cx,
+							v.top/this.size.cy,
+							v.right/this.size.cx,
+							v.bottom/this.size.cy
+							); 
+		})
+		return boxes,scores,ids; 
+	}
+	
+	forward = function(names){
+		var mats = ..cv2.vector.mat(#names).toArray()
+		var err,ret = dll.dnn_Net_forward3(this.ptr,{pointer value[]=mats},#names,{string s[]=names},#names)
+		var confidences = {}
+		var boxes = {}
+		var classIds = {}
+		var floatSize = ..raw.sizeof({float v}) 
+		//loop start
+		for(i=1;#mats;1){
+			var data = mats[i].data;
+			for(j=1;mats[i].rows;1){
+				var scores = mats[i].row(j-1).colRange(5,mats[i].cols);
+				var minVal,maxVal,minLoc0,maxLoc0 = ..cv2.minMaxLoc(scores)
+				var floatArray = ..raw.convert(data,{float value[4]}, mats[i].cols*(j-1)*floatSize).value
+				if(maxVal>this.$config.confThreshold){
+					centerX = ..math.floor( floatArray[1] * this.size.cx )
+					centerY = ..math.floor( floatArray[2] * this.size.cy )
+					width = ..math.floor(floatArray[3] * this.size.cx)
+					height = ..math.floor(floatArray[4] * this.size.cy)
+					left = ( centerX - ..math.floor(width/2) )
+					top = ( centerY - ..math.floor(height/2) )
+					..table.push( boxes,::RECT(left,top,width,height) )
+					//..table.push( boxes,::RECT(floatArray[1],floatArray[2],floatArray[3],floatArray[4]) )
+					..table.push( confidences,maxVal )
+					..table.push(classIds,maxLoc0.x)
+				}
+			}
+		}
+		//loop end
+		return this.nmsBoxesRect(boxes,confidences,classIds); 
+		
+	}
 }
-//待智能提示
-matchTemplate = function(src,temp,mode=5/*_CV2_TM_CCOEFF_NORMED*/,mask){
-    var dst = ..cv2.mat()
-	var err = dll.imgproc_matchTemplate(src.cvPtr,temp.cvPtr,dst.cvPtr,mode,mask)
-	return dst; 
+/*}}*/
+
+//以下为第三方库，按需封装
+/*WeChatQRCode{{*/
+class wechat_qrcode_WeChatQRCode{
+	ctor( detector_prototxt_path,detector_caffe_model_path,super_resolution_prototxt_path,super_resolution_caffe_model_path){
+		var err,ret = dll.wechat_qrcode_WeChatQRCode_new(detector_prototxt_path,
+		detector_caffe_model_path,
+		super_resolution_prototxt_path,
+		super_resolution_caffe_model_path,{pointer value})
+		this.ptr = ret.value
+		..table.gc( this,"release" )
+	};
+	
+	detectAndDecode = function(img){
+		var points = ..cv2.vector.mat()
+		var lists = ..cv2.vector.string();
+		var err = dll.wechat_qrcode_WeChatQRCode_detectAndDecode(this.ptr,img.cvPtr,points,lists);
+		var mats = points.toArray();
+		resPoints = ..table.map(mats,function(v,k,result){
+			var minRect = ..cv2.minAreaRect(v);
+			var minRectPoints = ..cv2.boxPoints(minRect)
+			v.release()
+			return minRectPoints;
+		})
+		var reLists = lists.toArray()
+		points.release();
+		lists.release()
+		return reLists,resPoints;
+	}
+	
+	release = function(){
+		if(this[["ptr"]]){
+			dll.wechat_qrcode_WeChatQRCode_delete(this.ptr);
+			this[["ptr"]] = null
+		}
+	}
 }
-//待智能提示
-minMaxLoc = function(src){
-    minLoc0 = ::POINT();
-    maxLoc0 = ::POINT();
-	var err,minVal,maxVal = core_minMaxLoc2(src.cvPtr,0,0,minLoc0,maxLoc0,null)
-	return minLoc0,maxLoc0; 
-}
+/*}}*/
 
 _dll = dll
 imgproc_GaussianBlur = dll.api("imgproc_GaussianBlur","int(pointer src,pointer dst,struct ksize,double sigmaX, double sigmaY, int borderType)")
+imgproc_bilateralFilter= dll.api("imgproc_bilateralFilter","INT(pointer src,pointer dst,int d,double sigmaColor,double sigmaSpace,int borderType)")
 imgproc_resize = dll.api("imgproc_resize","pointer(pointer,pointer,struct,double,double,int)")
 imgproc_threshold = dll.api("imgproc_threshold","int(pointer src,pointer dst,double thresh,double maxVal, int type, double& returnValue)")
 imgproc_Canny1 = dll.api("imgproc_Canny1","int(pointer src,pointer edges,double threshold1,double threshold2,int apertureSize, bool L2gradient)" )
@@ -355,78 +661,214 @@ imgproc_ellipse1 = dll.api("imgproc_ellipse1","int(pointer img,struct center,str
 imgproc_putText = dll.api("imgproc_putText","int(pointer img,string text,struct org,int fontFace,double fontScale,struct color,int thickness,int lineType, int bottomLeftOrigin)")
 imgproc_adaptiveThreshold = dll.api("imgproc_adaptiveThreshold","INT(pointer src,pointer dst,double maxValue,int adaptiveMethod,int thresholdType, int blockSize,double C)")
 core_minMaxLoc2 = dll.api("core_minMaxLoc2","INT(pointer src,double& minVal,double& maxVal,struct& minLoc,struct& maxLoc,pointer mask)")
+core_addWeighted= dll.api("core_addWeighted","INT(pointer src1,double alpha,pointer &src2,double beta,double gamma,pointer dst,int dtype)")
 videoio_VideoCapture_get = dll.api("videoio_VideoCapture_get","INT(pointer capture,int propId,double& ret)")
 videoio_VideoCapture_set = dll.api("videoio_VideoCapture_set","INT(pointer capture,int propId,int& ret)")
+dnn_blobFromImage= dll.api("dnn_blobFromImage","INT(pointer image,double scalefactor,struct size,struct mean,int swapRB,int crop,pointer& returnValue)")
+dnn_NMSBoxes_Rect = dll.api("dnn_NMSBoxes_Rect","INT(pointer bboxes,pointer scores,float score_threshold,float nms_threshold,pointer indices,float eta,int top_k)" )
+imgproc_filter2D= dll.api("imgproc_filter2D","INT(pointer src,pointer dst,int ddepth,pointer kernel,struct anchor,double delta,int borderType)")
 
 namespace cv2{   
     import fsys
 	import cv2.mat
-	import cv2.vectorOfMat
 	import cv2.types
+	import cv2.vector
 }
 
 /**intellisense(cv2)
 imread() = !matObject.
 imread(.(图片路径,载入模式) = 读取图片
+imwrite(.(路径,输入图像) = 保存图片至本地路径
 imshow(.(窗口标题,显示内容) = 弹出窗口,显示图片
 destroyAllWindows() = 销毁所有cv2窗体
 waitKey(0) = 窗口等待键盘指令,返回键位码
 waitKey(.(延时 单位毫秒) = 窗口延时等待
 namedWindow(.(窗口标题,缩放类型_CV2_WINDOW) = 设置cv窗口
 cvGetWindowHandle(.(窗口标题) = 根据窗口标题获取cv窗口句柄
+threshold() = !matObject.
 threshold(.(灰度图,起始值,最大值,二值化算法-默认THRESH_BINARY) = 图像阈值处理
+adaptiveThreshold() = !matObject.
 adaptiveThreshold(.(灰度化图像,最大灰度值,自适应阈值算法,二值化方法,区域大小,常数 可为负数) = 自适应阈值二值化
+medianBlur() = !matObject.
 medianBlur(.(源数据,核大小) = 中值滤波
+resize() = !matObject.
 resize(.(源数据,::SIZE对象,x轴缩放倍数,y轴缩放倍数,插值方式) = 调整图片大小
+gaussianBlur() = !matObject.
 gaussianBlur(.(输入图像,::SIZE对象 高斯核大小,X方向上的高斯核标准偏差, Y方向上的高斯核标准差,边缘模式) = 高斯滤波
+blur() = !matObject.
 blur(.(输入图像,::SIZE对象 核大小) = 均值滤波,对于椒盐噪声的滤除效果比较好。
+boxFilter() = !matObject.
 boxFilter(.(输入图像,输出图像深度 默认-1 与输入图像相同,::SIZE对象 核大小,是否标准化 默认true 为false时与blur函数相同,边缘模式) = 方块滤波
+bilateralFilter() = !matObject.
+bilateralFilter(.(输入图像,邻域直径范围,颜色空间过滤器的sigma值,坐标空间中滤波器的sigma值,边缘模式) = 双边滤波,此函数运行较慢
+cvtColor() = !matObject.
 cvtColor(.(输入图像,颜色空间代码) = 转换颜色空间
+canny() = !matObject.
 canny(.(输入图像,阈值1,阈值2,Sobel算子大小 默认3,是否使用L2范数 默认true) = 边缘检测
+line() = !matObject.
 line(.(输入图像,起点POINT对象,终点POINT对象,颜色Scalar对象BGRA,线条宽度 默认1像素,线条类型 可选 ) = 在输入图像上画线段
+arrowedLine() = !matObject.
 arrowedLine(.(输入图像,起点POINT对象,终点POINT对象,颜色Scalar对象BGRA,线条宽度 默认1像素 ,线条类型 可选,箭头笔尖的长度 默认0.1 ) = 在输入图像上画箭头线段
+rectangle() = !matObject.
 rectangle(.(输入图像,起点POINT对象,终点POINT对象,颜色Scalar对象BGRA,线条宽度 默认1像素 为-1时填充闭合区域,线条类型 可选) = 在输入图像上画矩形
+circle() = !matObject.
 circle(.(输入图像,中心点坐标 POINT对象,圆半径,线条颜色 Scalar对象BGRA,线条宽度 默认1像素 为-1时填充闭合区域,线条类型 可选) = 在输入图像上画圆形
+ellipse() = !matObject.
 ellipse(.(输入图像,椭圆中心坐标 POINT对象,椭圆长轴短轴 SIZE对象,椭圆旋转角度以度为单位,椭圆弧的起始角度以度为单位,椭圆弧的终止角度以度为单位,线条颜色 Scalar对象BGRA,线条宽度 默认1像素 为-1时填充闭合区域,线条类型 可选) = 在输入图像上画椭圆
+drawMarker() = !matObject.
 drawMarker(.(输入图像,图案坐标,图案描边颜色,图案类型,图案尺寸 默认20,线条宽带 默认1像素,线条类型 可选) = 在输入图像上画图案
-putText(.(输入图像,文字,左上角坐标,字体 可选,字体大小 可选,颜色Scalar对象BGRA 可选,字体粗细 可选) = 在输入图像上写文字
+putText() = !matObject.
+putText(.(输入图像,文字,左上角坐标,字体 可选,字体大小 可选,颜色Scalar对象BGRA 可选,字体粗细 可选) = 在输入图像上写文字,暂不支持中文
+copyMakeBorder() = !matObject.
 copyMakeBorder(.(输入图像,上边宽度,下边宽度,左边宽度,右边宽度,边界类型 可选,边框类型为0时,可设置边框颜色 默认黑色) = 扩充图像边框,返回新图像
+getStructuringElement() = !matObject.
 getStructuringElement(.(元素形状 默认矩形,元素大小 ::SIZE对象,锚点位置 默认中心点) = 返回指定形状和尺寸的内核矩阵 
+morphologyEx() = !matObject.
 morphologyEx(.(输入图像,形态学类别,结构内核,迭代次数 默认为1) = 通用形态学变换,可作用在输入图像上
+erode() = !matObject.
 erode(.(输入图像,结构内核,迭代次数 默认为1) = 腐蚀操作
+dilate() = !matObject.
 dilate(.(输入图像,结构内核,迭代次数 默认为1) = 膨胀操作
+normalize() = !matObject.
 normalize(.(输入图像,alpha值,beta值) = 图像归一化
-bitwise_and(.(输入图像1,输入图像2) = 对图像的每一个像素值进行逻辑与操作
-bitwise_or(.(输入图像1,输入图像2) = 对图像的每一个像素值进行逻辑或操作
-bitwise_xor(.(输入图像1,输入图像2) = 对图像的每一个像素值进行逻辑异或操作
-bitwise_not(.(输入图像1,输入图像2) = 对图像的每一个像素值进行逻辑非操作
+bitwise_and() = !matObject.
+bitwise_and(.(输入图像1,输入图像2,mask腌膜 可选) = 对图像的每一个像素值进行逻辑与操作
+bitwise_or() = !matObject.
+bitwise_or(.(输入图像1,输入图像2,腌膜 可选) = 对图像的每一个像素值进行逻辑或操作
+bitwise_xor() = !matObject.
+bitwise_xor(.(输入图像1,输入图像2,腌膜 可选) = 对图像的每一个像素值进行逻辑异或操作
+bitwise_not() = !matObject.
+bitwise_not(.(输入图像1,输入图像2,腌膜 可选) = 对图像的每一个像素值进行逻辑非操作
+split(.(输入图像) = 将图像拆分成BGR通道图像,返回B G R 3个mat对象
+merge() = !matObject.
+merge(.(BGR通道图像数组)) = 将BGR通道图像合并
+flip() = !matObject.
+flip(.(输入图像,翻转码 1水平翻转 0垂直翻转 -1水平垂直翻转) = 图像翻转
+rotate() = !matObject.
+rotate(.(输入图像,旋转码 _CV2_ROTATE_) = 将2D图像矩阵旋转90度的倍数
+subtract() = !matObject.
+subtract(.(输入图像1,输入图像2,图像掩码 可选,输出图像深度 可选) = 图像减法运算
+add() = !matObject.
+add(.(输入图像1,输入图像2,图像掩码 可选,输出图像深度 可选) = 图像加法运算
+addWeighted() = !matObject.
+addWeighted(.(输入图像1,图像1权重,输入图像2,图像2权重,偏移量 缺省为0,深度 缺省-1) = 图像融合
+matchTemplate() = !matObject.
+matchTemplate(.(待搜索图像,模板图像,匹配模式 默认5,图像腌膜 可选) = 模板匹配
+minMaxLoc(.(输入矩阵) = 返回输入矩阵的最小值,最大值,最小值索引,最大值索引
+distanceTransform() = !matObject.
 distanceTransform(.(输入图像,距离算法类型,距离变换腌膜大小) = 距离变换
+inRange() = !matObject.
+inRange(.(输入图像,包含下边界的数组或标量,包含上边界数组或标量) = 多通道阈值二值化
 findContours(.(输入图像,轮廓检索模式,轮廓近似方法) = 轮廓检测
+drawContours() = !matObject.
 drawContours(.(输入图像,轮廓数组,绘制起点 默认-1,线条颜色,线条宽度 为-1时填充图案,线条样式) = 在输入图像上绘制轮廓
 minAreaRect(.(points点集合) = 获取最小外接矩形,返回RotatedRect对象
 boxPoints(.(RotatedRect对象) = 矩形四角坐标,返回4个::POINTF对象数组
 getTickCount() = 获取当前系统启动时间，单位毫秒
+compare() = !matObject.
+compare(.(输入矩阵1,输入矩阵2,比较符_CV2_CMP) = 比较2个矩阵,返回结果矩阵,匹配像素标记为255 不匹配标记返回0
+filter2D() = !matObject.
+filter2D(.(输入图像,目标深度 默认-1,卷积核 由getStructuringElement函数构建,内核锚点 缺省为中心点,偏置值 缺省为0,外推法 可选) = 任意线性滤波器卷积\n如果锚点坐标为中心点,卷积核大小可以为偶数
 end intellisense**/
 
 /**intellisense()
 cv2.videoCapture() = 视频或摄像头解析对象
 cv2.videoCapture( = 创建视频解析对象
-cv2.videoCapture(.(摄像头编号或视频路径) = 创建视频解析对象
+cv2.videoCapture(.(摄像头编号或视频路径) = 创建视频解析对象,视频为非avi mpg格式时需opencv_videoio_ffmpeg452.dll
 cv2.videoCapture() = !cap.
 !cap.read() = 读取视频下一帧，返回读取状态,mat对象
 !cap.isOpened = 检测视频或摄像头是否打开，注意：视频有时候并不准确
 !cap.get(.(_CV2_CAP_PROP_) = 获取videoCapture对象参数
 !cap.set(.(_CV2_CAP_PROP_) = 设置videoCapture对象参数
+!cap.grab() = 从视频文件或捕获设备中获取下一帧
+!cap.retrieve() = 解码并返回抓取的视频帧,返回mat对象
+!cap.getBackendName() = 获取API后端名称
+!cap.release() = 释放videoCapture对象,解除视频文件或摄像头占用
+end intellisense**/
+
+/*intellisense()
+cv2.dnn_DetectionModel() = 基于深度学习的目标检测推理模块,支持TensorFlow Pytorch Torch Caffe DarkNet ONNX框架模型\n!dnnDetection.
+cv2.dnn_DetectionModel( = 创建目标检测推理对象,支持yolo ssd等常见网络
+cv2.dnn_DetectionModel(.(权重文件,网络结构文件,推理引擎 缺省为opencv,运行载体 缺省为CPU) = 创建目标检测推理对象
+!dnnDetection.getUnconnectedOutLayersNames() = 获取输出层名称,返回字符串数组
+!dnnDetection.setInputSize(.(高,宽) = 设置输入大小
+!dnnDetection.setInputScale(1.0/255) = 设置缩放比例
+!dnnDetection.setInputSwapRB(true) = 设置是否交换RB通道
+!dnnDetection.blobFromImage(.(图像矩阵) = 返回一个4通道N维数组,结构为NCHW,用于神经网络输入
+!dnnDetection.setConfig( 参数表 ) = @.setConfig({
+	confThreshold = 0.5; //分类置信度\n
+	nmsThreshold = 0.4; //nms置信度\n
+})
+
+!dnnDetection.setInput(.(blob) = 将数据输入到网路中
+!dnnDetection.forward(.(输出层数组) = 前向推理,返回boxes scores classIds 
+!dnnDetection.setMean(.(b,g,r) = 设置各通道均值,默认为0 0 0
+/*end intellisense*/
+
+
+/**intellisense()
+cv2.mat() = 创建Mat矩阵对象\n!matObject.
+cv2.mat() = 创建一个空Mat矩阵
+cv2.mat(.(Mat指针) = 由Mat指针创建Mat矩阵
+cv2.mat(.(bitmap对象) = 由bitmap对象创建Mat矩阵
+cv2.mat(.(输入Mat矩阵,::RECT对象) = 从感兴趣区域(ROI)中创建Mat对象
 end intellisense**/
 
 /**intellisense(!matObject)
+!matObject() = !matObject.
+!matObject(.(x,y,w,h) = 截取矩阵,返回新矩阵
 type() = 图片类型
+cols = 图片列数
 width = 图片宽度
+rows = 图片行数
 height = 图片高度
 channels() = 图片通道数
 depth() = 图片深度
 shape = 图片形状，包括高度、宽度、通道数
 empty() = 判断是否图像是否为空
 size() = 获取图片尺寸,返回::SIZE结构体
+data = Mat对象data内存指针
+datastart = 
+dataend = 
+datalimit = 
+cvPtr = Mat对象输入输出指针,一般作为api参数被调用
+elemSize = 矩阵一个元素占用的字节数
+elemSize1 = 矩阵元素一个通道占用的字节数
 toBitmap() = 转换为bitmap对象,返回bitmap对象
+clone() = 深拷贝Mat矩阵\n!matObject.
+ones() = !matObject.
+ones(.(行数,列数,矩阵类型) = 生成所有元素为1的Mat对象
+zeros() = !matObject.
+zeros(.(行数,列数,矩阵类型) = 生成所有元素为0的Mat对象
+eye() = !matObject.
+eye(.(行数,列数,矩阵类型) = 返回一个恒等指定大小和类型矩阵
+t() = 转置矩阵\n!matObject.
+convertTo() = !matObject.
+convertTo(.(转换类型_CV_,缩放因子,偏移因子) = 转换矩阵类型
+at(.(...) = 获取矩阵中某点的值,支持1-3维参数,返回最大10个索引的数组
+row() = !matObject.
+row(.(行号) = 获取矩阵中的某行矩阵对象
+col() = !matObject.
+col(.(行号) = 获取矩阵中的某列矩阵对象
+rowRange() = !matObject.
+rowRange(.(起行,止行) = 为矩阵的指定行区间创建一个矩阵头.索引从0开始,且左开右闭
+colRange() = !matObject.
+colRange(.(起列,止列) = 为矩阵的指定列区间创建一个矩阵头.索引从0开始,且左开右闭
+diag() = 以一维数组的形式返回矩阵的对角线(或非对角线)元素\n!matObject.
+isContinuous() = 矩阵成员是否连续
+exp() = !matObject.
+exp() = 返回所有元素的指数,返回新矩阵
+log() = !matObject.
+log() = 返回所有元素的自然对数,返回新矩阵.当源像素<=0,返回的像素上会被标记为一个大的负数
+release() = 释放Mat对象,Mat占用内存较大时,需手动调用该函数
+end intellisense**/
+
+//第三方库
+/**intellisense()
+cv2.wechat_qrcode_WeChatQRCode() = 微信QRCode解码对象,相关模型至https://github.com/WeChatCV/opencv_3rdparty下载
+cv2.wechat_qrcode_WeChatQRCode( = 创建微信QRCode解码对象
+cv2.wechat_qrcode_WeChatQRCode(.(detect网络,detect权重,sr网络,sr权重) = 创建微信QRCode解码对象
+cv2.wechat_qrcode_WeChatQRCode() = !QRCode.
+!QRCode.detectAndDecode(.(输入图像) = 定位并解码二维码,返回 识别字符串数组,最小外接矩形四角POINT数组
+!QRCode.release() = 释放微信QRCode解码对象,可自动回收
 end intellisense**/

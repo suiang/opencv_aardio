@@ -1,6 +1,8 @@
-﻿import util.metaProperty
+﻿//mat 矩阵类
+import util.metaProperty
 import gdip
 import cv2.matExpr
+import console
 namespace cv2;
 class mat{
 	ctor( arg,... ){ //
@@ -13,6 +15,9 @@ class mat{
 			err,ret = dll.core_Mat_new1({ptr p})
 			this.handle = ret.p
 		}
+		elseif( tArg== type.table && type.rget(arg)=="CvSlice" ){
+			//todo
+		}
 		//bitmap传入
 		elseif(tArg == type.table && arg[["pBitmap"]]){
 			var data = arg.lockData()
@@ -24,6 +29,12 @@ class mat{
 		elseif(tArg==type.table and type.rget(arg)=="mat" and type(...)==type.table){
 			var roi = ... 
 			err,roi,ret = dll.core_Mat_new7(arg.handle,roi,{pointer value});
+			this.handle = ret.value
+		}
+		elseif(tArg==type.number){
+			var params = {...} // rows cols type data step 
+			//..console.log(arg,params[1],params[2],params[3],params[4],params[5])
+			err,ret = dll.core_Mat_new8(arg,params[1],params[2],params[3],params[4],params[5],{pointer value})
 			this.handle = ret.value
 		}
 		
@@ -76,6 +87,48 @@ class mat{
 		return ret.value; 
 	}
 	
+	at = function(...){
+		var params = {...};
+		var paramsLen = #params
+		var ref = {ptr value}
+		if(paramsLen==1){
+			dll.core_Mat_ptr1d(this.handle,params[1],ref);
+		}elseif(paramsLen==2){
+			dll.core_Mat_ptr2d(this.handle,params[1],params[2],ref);
+		}elseif(paramsLen==3){
+			dll.core_Mat_ptr3d(this.handle,params[1],params[2],params[3],ref);
+		}
+		var buffer = ..raw.buffer(0xA/*_CV_MAX_ARR*/,ref.value)
+		return buffer;
+		//var ret = ..raw.convert(ref.value,{BYTE value[0xA/*_CV_MAX_ARR*/]})
+		//return ret.value;
+	}
+	
+	row = function(y){
+		var err,ret = dll.core_Mat_row(this,y,{pointer value})
+		return ..cv2.mat(ret.value); 
+	}
+	
+	col = function(x){
+		var err,ret = dll.core_Mat_col(this,x,{pointer value})
+		return ..cv2.mat(ret.value); 
+	}
+	
+	rowRange = function(startRow,endRow){
+		var err,ret = dll.core_Mat_rowRange(this,startRow,endRow,{pointer value})
+		return ..cv2.mat(ret.value); 
+	}
+	
+	colRange = function(startCol,endCol){
+		var err,ret = dll.core_Mat_colRange(this,startCol,endCol,{pointer value})
+		return ..cv2.mat(ret.value); 
+	}
+	
+	diag = function(d){
+		var err,ret = dll.core_Mat_diag(this,d,{pointer value})
+		return ..cv2.mat(ret.value); 
+	}
+	
 	isContinuous = function(){
 		var err,ret = dll.core_Mat_isContinuous(this,{int value})
 		return ret.value != 0; 
@@ -112,15 +165,47 @@ class mat{
 		return m; 
 	}
 	
+	eye = function(rows,cols,tp){
+		var err,ret = dll.core_Mat_eye(rows,cols,tp,{pointer p})
+		var m = ..cv2.matExpr(ret.p)
+		return m; 
+	}
+	
+	t = function(){
+		var err,ret = dll.core_Mat_t(this,{pointer p})
+		var m = ..cv2.matExpr(ret.p)
+		return m; 
+	}
+	
 	convertTo = function(rtype,alpha=1,beta=0){
-		//var dst = ..cv2.mat();
-		var err = core_Mat_convertTo(this,this.cvPtr,rtype,alpha,beta)
-		return this;
+		var dst = ..cv2.mat();
+		var err = core_Mat_convertTo(this,dst.cvPtr,rtype,alpha,beta)
+		return dst;
+	}
+	
+	reshape = function(){
+		//core_Mat_reshape1
+	}
+	
+	exp = function(){
+		var dst = ..cv2.mat();
+		dll.core_exp_Mat(this.cvPtr,dst.cvPtr)
+		return dst; 
+	}
+	
+	log = function(){
+		var dst = ..cv2.mat();
+		dll.core_log_Mat(this.cvPtr,dst.cvPtr)
+		return dst; 		
 	}
 	
 	release = function(){
-		dll.core_InputArray_delete(this.cvPtr)
-		dll.core_Mat_delete(this)
+		if(this[["handle"]] && this[["cvPtr"]]){
+			dll.core_InputArray_delete(this.cvPtr)
+			dll.core_Mat_delete(this)
+			this[["handle"]] = null;
+			this[["cvPtr"]] = null	
+		}
 	}
 	@_metaProperty;
 }
@@ -135,6 +220,12 @@ namespace mat {
 			return owner.handle; 
 		}
 		_type = "mat";
+		
+		_call = function(x,y,w,h){
+			var r = ::RECT(x,y,w,h)
+			return ..cv2.mat(owner,r); 
+		}
+		
 
 /*
 		cvPtr = {
@@ -151,7 +242,28 @@ namespace mat {
 				return stu.buffer;	
 			}
 		}
+		
+		datastart = {
+			_get = function(){
+				var err,stu = dll.core_Mat_datastart(owner.handle,{ptr buffer})
+				return stu.buffer;	
+			}
+		}		
 	
+		dataend = {
+			_get = function(){
+				var err,stu = dll.core_Mat_dataend(owner.handle,{ptr buffer})
+				return stu.buffer;	
+			}
+		}
+	
+		datalimit = {
+			_get = function(){
+				var err,stu = dll.core_Mat_datalimit(owner.handle,{ptr buffer})
+				return stu.buffer;	
+			}
+		}	
+			
 		cols = {
 			_get = function(){
 				var err,stu = dll.core_Mat_cols(owner.handle,{int value}); 
@@ -190,5 +302,14 @@ namespace mat {
 				return stu.value; 
 			}
 		}
+		
+		elemSize1 = {
+			_get = function(){
+				var err,stu = dll.core_Mat_elemSize1(owner.handle,{int value})
+				return stu.value; 
+			}
+		}
+		
+		
 	)
 }

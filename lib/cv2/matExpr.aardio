@@ -1,4 +1,5 @@
-﻿import util.metaProperty
+﻿//matExpr 矩阵表达式
+import util.metaProperty
 namespace cv2
 
 class matExpr{
@@ -20,7 +21,10 @@ class matExpr{
 	}
 	
 	release = function(){
-		dll.core_MatExpr_delete(this.ptr)
+		if this[["ptr"]] {
+			dll.core_MatExpr_delete(this.ptr)
+		}
+		this[["ptr"]] = null
 	}
 	
 	@_meta;
